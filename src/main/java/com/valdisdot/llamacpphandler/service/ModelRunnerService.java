@@ -26,15 +26,82 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Service for managing and running Llama.cpp model inference processes.
+ * <p>
+ * This service handles the lifecycle of model inference processes, including:
+ * <ul>
+ *   <li>Listing available models from the models directory</li>
+ *   <li>Starting new model inference processes</li>
+ *   <li>Stopping running models</li>
+ *   <li>Monitoring process status and health</li>
+ * </ul>
+ *
+ * <p>
+ * The service maintains a registry of running models in a thread-safe manner,
+ * mapping process IDs to their corresponding configurations.
+ * </p>
+ *
+ * <p>
+ * Example usage:
+ * <pre>{@code
+ * ModelRunnerService service = modelRunnerServiceBean;
+ *
+ * // List available models
+ * List<ModelRecord> models = service.listAvailableModels();
+ *
+ * // Run a model with configuration
+ * ModelEntry entry = service.runModel(config);
+ *
+ * // Stop a running model
+ * service.stopModel(entry.getPid());
+ *
+ * // Get all running models
+ * List<ModelEntry> running = service.getAllRunningModels();
+ * }</pre>
+ */
 @Service
 public class ModelRunnerService {
+
+    /**
+     * Logger for this service.
+     */
     private final Logger logger = LogManager.getLogger(this.getClass());
+
+    /**
+     * Executor service for logging process output asynchronously.
+     * Uses a cached thread pool to handle multiple processes concurrently.
+     */
     private final ExecutorService logExecutor = Executors.newCachedThreadPool();
+
+    /**
+     * Thread-safe map tracking running models by their process ID.
+     * Key: Process ID (PID), Value: Model configuration.
+     */
     private final Map<Long, ModelConfig> runningModels;
+
+    /**
+     * Default model configuration used when specific values are not provided.
+     */
     private final ModelConfig defaultModelConfig;
+
+    /**
+     * Path to the llama.cpp binary executable.
+     */
     private final String binPath;
+
+    /**
+     * Path to the directory containing model files.
+     */
     private final String modelsDir;
 
+    /**
+     * Constructs a new ModelRunnerService instance.
+     *
+     * @param binPath         Path to the llama.cpp binary executable
+     * @param modelsDir       Path to the directory containing model files
+     * @param defaultModelConfig Default configuration to use for unspecified parameters
+     */
     public ModelRunnerService(
             @Value("${application.llamacpp.bin}") String binPath,
             @Value("${application.models}") String modelsDir,
@@ -46,6 +113,20 @@ public class ModelRunnerService {
         this.runningModels = new ConcurrentHashMap<>();
     }
 
+    /**
+     * Scans the models directory and returns a list of available models.
+     * <p>
+     * Each model is represented as a {@link ModelRecord} containing:
+     * <ul>
+     *   <li>Model name (directory name)</li>
+     *   <li>Whether vision processing is supported (mmproj.gguf exists)</li>
+     *   <li>Whether embeddings are available</li>
+     * </ul>
+     * </p>
+     *
+     * @return List of available model records
+     * @throws RuntimeException if directory scanning fails
+     */
     public List<ModelRecord> listAvailableModels() {
         List<ModelRecord> modelsList = new ArrayList<>();
         Path modelsPath = Paths.get(modelsDir);
@@ -73,10 +154,22 @@ public class ModelRunnerService {
         return modelsList;
     }
 
+    /**
+     * Checks if a model is currently running by its process ID.
+     *
+     * @param pid The process ID to check
+     * @return {@code true} if a model with the given PID is running, {@code false} otherwise
+     */
     public boolean isRunning(Long pid) {
         return runningModels.containsKey(pid);
     }
 
+    /**
+     * Retrieves information about a running model by its process ID.
+     *
+     * @param pid The process ID of the running model
+     * @return {@link Optional} containing {@link ModelEntry} if model is running, empty otherwise
+     */
     public Optional<ModelEntry> getRunningModel(Long pid) {
         if (runningModels.containsKey(pid)) {
             ModelConfig config = runningModels.get(pid);
@@ -85,12 +178,35 @@ public class ModelRunnerService {
         return Optional.empty();
     }
 
+    /**
+     * Retrieves information about all currently running models.
+     *
+     * @return List of {@link ModelEntry} objects for all running models
+     */
     public List<ModelEntry> getAllRunningModels() {
         return runningModels.entrySet().stream()
                 .map(entry -> new ModelEntry(entry.getKey(), this.getHostAddress(entry.getValue().getServeLocal()), entry.getValue()))
                 .toList();
     }
 
+    /**
+     * Starts a new model inference process with the given configuration.
+     * <p>
+     * This method performs the following steps:
+     * <ol>
+     *   <li>Fills in missing configuration values from defaults</li>
+     *   <li>Validates that the model directory and file exist</li>
+     *   <li>Checks if the specified port is available</li>
+     *   <li>Constructs and executes the llama.cpp command</li>
+     *   <li>Monitors process startup until ready or timeout</li>
+     *   <li>Registers the running process in the service registry</li>
+     * </ol>
+     * </p>
+     *
+     * @param config The model configuration to use for starting the process
+     * @return {@link ModelEntry} containing process ID, host address, and configuration
+     * @throws RuntimeException if model startup fails or times out
+     */
     public ModelEntry runModel(ModelConfig config) {
         fulfillModelConfig(config);
 
@@ -234,6 +350,15 @@ public class ModelRunnerService {
         }
     }
 
+    /**
+     * Stops a running model by its process ID.
+     * <p>
+     * This method terminates the process and all its child processes,
+     * then removes the model from the running registry.
+     * </p>
+     *
+     * @param pid The process ID of the model to stop
+     */
     public void stopModel(Long pid) {
         if (runningModels.containsKey(pid)) {
             ProcessHandle.of(pid).ifPresent(handle -> {
@@ -244,10 +369,26 @@ public class ModelRunnerService {
         }
     }
 
+    /**
+     * Stops all currently running models.
+     * <p>
+     * This method iterates through all registered models and stops each one.
+     * Useful for cleanup during service shutdown.
+     * </p>
+     */
     public void stopAllModels() {
         new ArrayList<>(runningModels.keySet()).forEach(this::stopModel);
     }
 
+    /**
+     * Fills in missing or invalid configuration values with defaults.
+     * <p>
+     * This method ensures that all required configuration parameters have valid values
+     * by using the default configuration when specific values are null, blank, or invalid.
+     * </p>
+     *
+     * @param config The configuration to validate and fill
+     */
     private void fulfillModelConfig(ModelConfig config) {
         if (config.getModel() == null || config.getModel().isBlank()) {
             config.setModel(defaultModelConfig.getModel());
@@ -301,11 +442,36 @@ public class ModelRunnerService {
         }
     }
 
+    /**
+     * Sanitizes an API key by removing potentially dangerous characters.
+     * <p>
+     * Only alphanumeric characters, underscores, and hyphens are preserved.
+     * This prevents shell injection vulnerabilities.
+     * </p>
+     *
+     * @param apiKey The API key to sanitize
+     * @return Sanitized API key, or null if input is null
+     */
     private String sanitizeApiKey(String apiKey) {
         if (apiKey == null) return null;
         return apiKey.replaceAll("[^a-zA-Z0-9_\\-]", "");
     }
 
+    /**
+     * Converts a quantization integer to its string representation.
+     * <p>
+     * Supported conversions:
+     * <ul>
+     *   <li>1-8: q1_0, q2_0, q3_0, q4_0, q5_0, q6_0, q7_0, q8_0</li>
+     *   <li>16: f16</li>
+     *   <li>32: f32</li>
+     *   <li>Other: f16 (default)</li>
+     * </ul>
+     * </p>
+     *
+     * @param quant The quantization integer value
+     * @return String representation of the quantization type
+     */
     private String convertQuant(Integer quant) {
         return switch (quant) {
             case 1, 2, 3, 4, 5, 6, 7, 8 -> "q" + quant + "_0";
@@ -314,29 +480,46 @@ public class ModelRunnerService {
         };
     }
 
+    /**
+     * Determines the host address to use based on the serveLocal configuration.
+     * <p>
+     * If serveLocal is false, attempts to find a non-loopback IPv4 address.
+     * Falls back to localhost if no suitable address is found.
+     * </p>
+     *
+     * @param serveLocal Whether to serve locally (localhost) or externally
+     * @return The appropriate host address
+     */
     private String getHostAddress(Boolean serveLocal) {
-        if (Boolean.FALSE.equals(serveLocal)) try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface iface = interfaces.nextElement();
-                if (!iface.isLoopback() && iface.isUp()) {
-                    Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        InetAddress address = addresses.nextElement();
+        if (Boolean.FALSE.equals(serveLocal)) {
+            try {
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                while (interfaces.hasMoreElements()) {
+                    NetworkInterface iface = interfaces.nextElement();
+                    if (!iface.isLoopback() && iface.isUp()) {
+                        Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                        while (addresses.hasMoreElements()) {
+                            InetAddress address = addresses.nextElement();
 
-                        if (address instanceof java.net.Inet4Address) {
-                            return address.getHostAddress();
+                            if (address instanceof java.net.Inet4Address) {
+                                return address.getHostAddress();
+                            }
                         }
                     }
                 }
-
+            } catch (SocketException e) {
+                logger.error("Error getting host address", e);
             }
-        } catch (SocketException e) {
-            logger.error("Error getting host address", e);
         }
         return "127.0.0.1";
     }
 
+    /**
+     * Checks if a specified port is available for binding.
+     *
+     * @param port The port number to check
+     * @return {@code true} if the port is available, {@code false} otherwise
+     */
     private boolean isPortAvailable(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
@@ -347,6 +530,12 @@ public class ModelRunnerService {
         }
     }
 
+    /**
+     * Cleanup method called when the service is being destroyed.
+     * <p>
+     * Stops all running models and shuts down the logging executor service.
+     * </p>
+     */
     @PreDestroy
     public void stopService() {
         this.stopAllModels();
