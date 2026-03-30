@@ -7,29 +7,34 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 
 /**
- * Configuration for model inference to run.<br>
- * <p>
+ * Configuration for model inference to run.
+ *
+ * <pre>
  * {
- * "model": "gemma3-4b-q4_0-qat",
- * "context": 0,
- * "cpu_threads": 4,
- * "port": 10000,
- * "serve_local": true,
- * "disable_vision": false,
- * "api_key": "an-api-key",
- * "lock_in_ram": true,
- * "k_cache_quant": 16,
- * "v_cache_quant": 16,
- * "offload_kv": true,
- * "layers_upload": -1
+ *   "model": "gemma3-4b-q4_0-qat",
+ *   "context": 0,
+ *   "cpu_threads": 4,
+ *   "port": 10000,
+ *   "serve_local": true,
+ *   "disable_vision": false,
+ *   "api_key": "an-api-key",
+ *   "lock_in_ram": true,
+ *   "k_cache_quant": 16,
+ *   "v_cache_quant": 16,
+ *   "offload_kv": true,
+ *   "layers_upload": -1
  * }
+ * </pre>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ModelConfig {
+
     /**
      * Model name for -a and -m arguments.
+     * <p>
      * Required: must be specified.
+     * </p>
      */
     @JsonProperty("model")
     private String model;
@@ -42,70 +47,91 @@ public class ModelConfig {
 
     /**
      * Number of CPU threads for -t argument.
+     * <p>
      * Required: must be specified and non-zero.
+     * </p>
      */
     @JsonProperty("cpu_threads")
     private Integer cpuThreads;
 
     /**
      * Port number for --port argument.
+     * <p>
      * Required: must be specified and non-zero.
+     * </p>
      */
     @JsonProperty("port")
     private Integer port;
 
     /**
      * Whether to serve locally (localhost) or externally.
+     * <p>
      * Required: must be specified.
+     * </p>
      */
     @JsonProperty("serve_local")
     private Boolean serveLocal;
 
     /**
      * Whether to ignore mmproj.gguf (disable vision).
+     * <p>
      * Optional: if true, disables vision processing.
+     * </p>
      */
     @JsonProperty("disable_vision")
     private Boolean disableVision;
 
     /**
      * API key for --api-key argument.
-     * The value will be stripped out potential shell injection characters just in case, allowing only alphanumerics, dashes, and underscores!
+     * <p>
+     * The value will be stripped of potential shell injection characters,
+     * allowing only alphanumerics, dashes, and underscores.
+     * </p>
+     * <p>
      * Required: must be specified.
+     * </p>
      */
     @JsonProperty("api_key")
     private String apikey;
 
     /**
      * Whether to lock model in RAM (--mlock).
+     * <p>
      * Optional: if true, prevents model from being swapped to disk.
+     * </p>
      */
     @JsonProperty("lock_in_ram")
     private Boolean lockInRam;
 
     /**
      * KV cache quantization type for --cache-type-k argument.
+     * <p>
      * Optional: specifies quantization for key cache.
+     * </p>
      */
     @JsonProperty("k_cache_quant")
     private Integer kCacheQuant;
 
     /**
      * V cache quantization type for --cache-type-v argument.
+     * <p>
      * Optional: specifies quantization for value cache.
+     * </p>
      */
     @JsonProperty("v_cache_quant")
     private Integer vCacheQuant;
 
     /**
-     * Flag for --no-kv-offload (applied if false)
+     * Flag for --no-kv-offload (applied if false).
      */
     @JsonProperty("offload_kv")
     private Boolean offloadKV;
 
     /**
      * Number of GPU layers to upload for --n-gpu-layers argument.
+     * <p>
      * Optional: specifies how many layers to offload to GPU.
+     * </p>
      */
     @JsonProperty("layers_upload")
     private Integer layersUpload;

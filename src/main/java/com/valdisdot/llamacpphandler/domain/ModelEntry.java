@@ -19,6 +19,9 @@ public class ModelEntry {
     @JsonProperty("pid")
     private Long pid;
 
+    /**
+     * The host where the llama.cpp is running.
+     */
     @JsonProperty("host")
     private String host;
 
