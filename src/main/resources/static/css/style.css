@@ -156,6 +156,11 @@ button {
     color: white;
 }
 
+.btn-busy {
+    background-color: #E0E0E0;
+    color: #9E9E9E;
+}
+
 .actions-wrapper {
     position: relative;
     display: inline-block;
@@ -163,11 +168,11 @@ button {
 
 .dropdown-menu {
     display: none;
-
 }
 
 .actions-wrapper:hover .dropdown-menu {
     display: block;
+    z-index: 1;
     position: absolute;
     background-color: rgba(233, 244, 237, 0.98);
     min-width: 120px;

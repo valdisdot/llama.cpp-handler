@@ -178,6 +178,7 @@ class HandlerServerConnector {
 * */
 class RunningModelEditor {
     #handlerServerConnector = null;
+    #isBusy = false;
 
     constructor(handlerServerConnector) {
         this.#handlerServerConnector = handlerServerConnector;
@@ -193,6 +194,7 @@ class RunningModelEditor {
                 return this.#handlerServerConnector.stopRunningModel(pid)
                     .then(stopResult => {
                         if (stopResult) {
+                            onSuccess();
                             return this.#handlerServerConnector.runModel(editedModelConfig)
                                 .then(runResult => {
                                     if (runResult) {
@@ -339,7 +341,7 @@ class RunningModelEditor {
         inputs["layers_upload"] = input;
 
         configRow = createElement("div", null, "config-row");
-        label = createElement("label", "Offload KV (RAM):", null, {"for": "offload_kv"});
+        label = createElement("label", "Offload KV (VRAM):", null, {"for": "offload_kv"});
         input = createElement("input", null, null, {
             "type": "checkbox",
             "id": "offload_kv",
@@ -389,11 +391,18 @@ class RunningModelEditor {
         const controllerRow = createElement("div", null, "control-row");
         const cancelButton = createElement("button", "Cancel", "btn-cancel");
         cancelButton.addEventListener("click", () => {
-            this.#hide();
+            if (!this.#isBusy) this.#hide();
         });
         controllerRow.append(cancelButton);
         const acceptButton = createElement("button", acceptButtonName, acceptButtonClasses);
         acceptButton.addEventListener("click", () => {
+            if (this.#isBusy) return;
+            this.#isBusy = true;
+            acceptButton.classList.replace(acceptButtonClasses, "btn-busy");
+            cancelButton.classList.replace("btn-cancel", "btn-busy");
+            acceptButton.textContent = "Loading...";
+
+
             let modelConfigClone = {...modelConfig};
 
             if (inputs["context"].value.trim() === "" || Number(inputs["context"].value) < -1) delete modelConfigClone["context"];
@@ -423,7 +432,15 @@ class RunningModelEditor {
             modelConfigClone["offload_kv"] = inputs["offload_kv"].checked;
 
             modelConfigProcessingCallback(modelConfigClone)
+                .catch(error => {
+                    this.#isBusy = false;
+                    acceptButton.classList.replace("btn-busy", acceptButtonClasses);
+                    cancelButton.classList.replace("btn-busy", "btn-cancel");
+                    acceptButton.textContent = acceptButtonName;
+                    throw error;
+                })
                 .then(res => {
+                    this.#isBusy = false;
                     if (res) {
                         this.#hide();
                     }
@@ -653,7 +670,7 @@ class RunningModelsController {
 * Init on document loaded.
 * */
 document.addEventListener("DOMContentLoaded", async () => {
-    const handlerServerConnector = new HandlerServerConnector("");
+    const handlerServerConnector = new HandlerServerConnector("http://192.168.0.201:10010");
     let isValid = await handlerServerConnector.validateApiKey();
     let attempts = 5;
     while (!isValid && attempts-- > 0) {
