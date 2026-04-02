@@ -367,8 +367,18 @@ public class ModelRunnerService {
     public void stopModel(Long pid) {
         if (runningModels.containsKey(pid)) {
             ProcessHandle.of(pid).ifPresent(handle -> {
-                handle.descendants().forEach(ProcessHandle::destroyForcibly);
-                handle.destroyForcibly();
+                try {
+                    for (ProcessHandle descendant : handle.descendants().toList()) {
+                        descendant.destroyForcibly();
+                        descendant.onExit().get(10, TimeUnit.SECONDS);
+                    }
+                    handle.destroyForcibly();
+                    handle.onExit().get(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (ExecutionException | TimeoutException e) {
+                    logger.error("Warning: Process {} did not exit in time.", pid);
+                }
             });
             runningModels.remove(pid);
         }
