@@ -287,6 +287,11 @@ public class ModelRunnerService {
             cmdList.add("--no-webui");
         }
 
+        cmdList.add("--fit");
+        cmdList.add("off");
+        cmdList.add("--props");
+        cmdList.add("--no-slots");
+
         ProcessBuilder pb = new ProcessBuilder(cmdList);
         pb.redirectErrorStream(true);
         Process process;
