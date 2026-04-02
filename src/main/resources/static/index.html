@@ -5,32 +5,44 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <title>LlamaCpp Handler</title>
     <link href="css/style.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
 </head>
 <body>
+<!-- vertical layout, 3/4 parent width, centered -->
 <div class="container">
+    <!-- vertical layout, 100% parent width, left-aligned -->
     <div class="header">
         <h1>LlamaCpp Handler</h1>
         <p>A UI-wrapper to start LLM locally using llama.cpp server</p>
     </div>
 
+    <!-- horizontal layout, 100% parent width, centered -->
     <div class="main">
-        <div class="content-section">
-            <h2>Currently running</h2>
-            <div id="currently-running">None.</div>
+        <!-- vertical layout, 2/3 parent width -->
+        <div class="left">
+            <div class="content-section">
+                <h2>Available models</h2>
+                <!-- target div container for table with available models -->
+                <div id="available-models">Loading...</div>
+            </div>
+            <div class="content-section">
+                <h2>Currently running</h2>
+                <!-- target div container for table with running models -->
+                <div id="currently-running">Loading...</div>
+            </div>
         </div>
-
-        <div class="content-section">
-            <h2>Available models</h2>
-            <div id="available-models">None.</div>
-        </div>
-
-        <div class="content-section">
-            <h2 id="current-action-name">Active action</h2>
-            <div id="current-action">
-                <p>Ensure you've upload the proper models and set up the application.properties before start.</p>
+        <!-- target div container for an edit component, js changes class to "right" on activation, to "right-hidden" on cancel -->
+        <!-- vertical layout, 1/3 parent width -->
+        <div class="right-hidden">
+            <div class="content-section">
+                <!-- target title for an edit component -->
+                <h2 id="running-model-editor-name"></h2>
+                <!-- target div container for an edit component -->
+                <div id="running-model-editor-component"></div>
             </div>
         </div>
     </div>
 </div>
+<script src="js/executable.js"></script>
 </body>
 </html>
