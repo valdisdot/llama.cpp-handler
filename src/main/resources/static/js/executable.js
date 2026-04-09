@@ -566,7 +566,8 @@ class RunningModelsController {
         const tableBody = createElement("tbody");
         table.append(tableBody);
 
-        document.getElementById("currently-running").replaceChildren(table);
+        const parent = document.getElementById("currently-running");
+        parent.replaceChildren(table);
 
         this.#handlerServerConnector.fetchRunningModels()
             .then(moderRunningRecords => {
@@ -643,6 +644,14 @@ class RunningModelsController {
                         tableBody.append(tr);
                     }
                 }
+                const stopAllButton = createElement("button", "Stop all", "btn-stop-all");
+                stopAllButton.addEventListener("click", () => {
+                      this.#handlerServerConnector.stopRunningModels()
+                          .then(res => {
+                              if (res) this.displayRunningModels();
+                          });
+                });
+                parent.append(stopAllButton);
             });
     }
 
@@ -670,7 +679,7 @@ class RunningModelsController {
 * Init on document loaded.
 * */
 document.addEventListener("DOMContentLoaded", async () => {
-    const handlerServerConnector = new HandlerServerConnector("http://192.168.0.201:10010");
+    const handlerServerConnector = new HandlerServerConnector("");
     let isValid = await handlerServerConnector.validateApiKey();
     let attempts = 5;
     while (!isValid && attempts-- > 0) {

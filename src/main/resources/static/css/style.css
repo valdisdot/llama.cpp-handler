@@ -129,6 +129,18 @@ button {
     color: white;
 }
 
+.btn-stop-all {
+    padding: 5px 15px;
+    margin-top: 10px;
+    font-weight: bold;
+    background-color: #d54646;
+    color: white;
+}
+
+.btn-stop-all:hover {
+    background-color: darkred
+}
+
 .btn-cancel {
     background-color: #e1e1e1;
 }
