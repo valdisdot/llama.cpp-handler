@@ -13,10 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.ServerSocket;
-import java.net.SocketException;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -509,23 +506,28 @@ public class ModelRunnerService {
         if (Boolean.FALSE.equals(serveLocal)) {
             try {
                 Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+
                 while (interfaces.hasMoreElements()) {
                     NetworkInterface iface = interfaces.nextElement();
-                    if (!iface.isLoopback() && iface.isUp()) {
-                        Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                        while (addresses.hasMoreElements()) {
-                            InetAddress address = addresses.nextElement();
+                    String name = iface.getName();
 
-                            if (address instanceof java.net.Inet4Address) {
-                                return address.getHostAddress();
-                            }
-                        }
+                    if (!iface.isUp() || iface.isLoopback() || iface.isVirtual() || iface.isPointToPoint() || name.startsWith("docker") || name.startsWith("veth") || name.startsWith("br-")) continue;
+
+                    Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        InetAddress address = addresses.nextElement();
+
+                        if (!(address instanceof Inet4Address)) continue;
+                        if (address.isLoopbackAddress() || address.isLinkLocalAddress()) continue;
+
+                        return address.getHostAddress();
                     }
                 }
             } catch (SocketException e) {
                 logger.error("Error getting host address", e);
             }
         }
+
         return "127.0.0.1";
     }
 
